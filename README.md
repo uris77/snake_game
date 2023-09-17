@@ -2,15 +2,22 @@
 
 Snake Game
 
-## Getting Started
+## State Management with Inherited Widget
 
-This project is a starting point for a Flutter application.
+- We need an object that holds the state we want to manage, e.g. `ScoresState`.
+- We need an `InheritedWidget` that holds the state object. The widget should have a static `of` method that returns the
+state object. The `of` method should call `dependOnInheritedWidgetOfExactType` to register itself as a dependent of the
+`InheritedWidget`:
+- 
+```dart
+  static ScoresState of(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<ScoresStateScope>()!
+        .scoresState;
+  }
+```
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- We need a stateful widget that wraps the inherited widget. This stateful widget also provides an `api` for interacting
+with any other service we might want to "provide" (like a persistent store or a service that calls an API). This
+stateful widget also has a static `of` method that returns its `state` object. The child widgets can use this to
+access the exposed `api`.

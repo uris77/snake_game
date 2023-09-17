@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
   window_manager: ^0.3.6
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -20,6 +22,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  isar_generator: ^3.1.0+1
+  build_runner: ^2.4.6
 
   flutter_lints: ^2.0.0
 
