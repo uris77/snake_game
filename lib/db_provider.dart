@@ -51,15 +51,15 @@ class ScoresStateWidget extends StatefulWidget {
   final Repository repository;
   final ScoresState initialState;
 
-  static ScoresStateWidgetState of(BuildContext context) {
-    return context.findAncestorStateOfType<ScoresStateWidgetState>()!;
+  static DbProvider of(BuildContext context) {
+    return context.findAncestorStateOfType<DbProvider>()!;
   }
 
   @override
-  State<ScoresStateWidget> createState() => ScoresStateWidgetState();
+  State<ScoresStateWidget> createState() => DbProvider();
 }
 
-class ScoresStateWidgetState extends State<ScoresStateWidget> {
+class DbProvider extends State<ScoresStateWidget> {
   ScoresState _data = ScoresState(latestScore: null, maxScore: null);
 
   @override

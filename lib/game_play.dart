@@ -4,14 +4,14 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:snake_game/db_provider.dart';
+import 'package:snake_game/game_parts.dart';
 import 'package:snake_game/persistence/entities/score.dart';
+import 'package:snake_game/player.dart';
 
 const width = 800.0;
 const height = 500.0;
 
 enum GameState { start, running, failure }
-
-enum Movement { up, down, left, right }
 
 class GamePlay extends StatefulWidget {
   const GamePlay({super.key});
@@ -23,12 +23,12 @@ class GamePlay extends StatefulWidget {
 class _GamePlayState extends State<GamePlay> {
   var gameState = GameState.start;
   Point newPointPosition = const Point(0, 0);
-  List<Point> snakePosition = List.empty();
   Timer timer = Timer.periodic(Duration.zero, (_) {});
   var _movement = Movement.up;
   int points = 0;
-  @override
+  Player playerSnake = Player();
 
+  @override
   Widget build(BuildContext context) {
     final provider = ScoresStateWidget.of(context);
     return Column(
@@ -52,7 +52,7 @@ class _GamePlayState extends State<GamePlay> {
               ),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTapDown:(_) => _handleTapDown(provider),
+                onTapDown: (_) => _handleTapDown(provider),
                 child: _buildChild(),
               ),
             ),
@@ -62,45 +62,50 @@ class _GamePlayState extends State<GamePlay> {
     );
   }
 
-
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyDownEvent && event.logicalKey.keyLabel == 'Arrow Up') {
       setState(() {
         _movement = Movement.up;
+        playerSnake.move = _movement;
       });
       return KeyEventResult.handled;
     }
     if (event is KeyDownEvent && event.logicalKey.keyLabel == 'Arrow Down') {
       setState(() {
         _movement = Movement.down;
+        playerSnake.move = _movement;
       });
       return KeyEventResult.handled;
     }
     if (event is KeyDownEvent && event.logicalKey.keyLabel == 'Arrow Left') {
       setState(() {
         _movement = Movement.left;
+        playerSnake.move = _movement;
       });
       return KeyEventResult.handled;
     }
     if (event is KeyDownEvent && event.logicalKey.keyLabel == 'Arrow Right') {
       setState(() {
         _movement = Movement.right;
+        playerSnake.move = _movement;
       });
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
 
-  void _handleTapDown(ScoresStateWidgetState provider) {
+  void _handleTapDown(DbProvider provider) {
     setState(() {
       switch (gameState) {
         case GameState.start:
-          startSnake();
+          playerSnake.initiateSnake(width);
           _newPoint();
           points = 0;
           gameState = GameState.running;
           _movement = Movement.up;
-          timer = Timer.periodic(const Duration(milliseconds: 300), (timer) => _onTick(timer, provider));
+          playerSnake.move = _movement;
+          timer = Timer.periodic(const Duration(milliseconds: 300),
+              (timer) => _onTick(timer, provider));
           break;
         case GameState.running:
           break;
@@ -118,8 +123,9 @@ class _GamePlayState extends State<GamePlay> {
     const max = height ~/ factor;
     final nextY = min + range.nextInt(max - min);
     final nextX = min + range.nextInt(max - min);
-    final isOutOfBounds = nextY.toDouble() > height ~/ factor || nextX.toDouble() > height ~/ factor;
-    if(isOutOfBounds) {
+    final isOutOfBounds = nextY.toDouble() > height ~/ factor ||
+        nextX.toDouble() > height ~/ factor;
+    if (isOutOfBounds) {
       _randomPoint();
     }
     return Point(nextX.toDouble(), nextY.toDouble());
@@ -128,7 +134,7 @@ class _GamePlayState extends State<GamePlay> {
   void _newPoint() {
     setState(() {
       final newPoint = _randomPoint();
-      if (snakePosition.contains(newPoint) ) {
+      if (playerSnake.hasPoint(newPoint)) {
         _newPoint();
       } else {
         newPointPosition = newPoint;
@@ -136,56 +142,37 @@ class _GamePlayState extends State<GamePlay> {
     });
   }
 
-  void _onTick(Timer timer, ScoresStateWidgetState provider) {
+  void _onTick(Timer timer, DbProvider provider) {
     setState(() {
-      snakePosition.insert(0, getCurrentSnakePosition());
-      snakePosition.removeLast();
+      playerSnake.grow();
+      playerSnake.shrink();
     });
-    final currentPosition = snakePosition.first;
-    if (currentPosition.x < 0 ||
-        currentPosition.x > width / 20 ||
-        currentPosition.y < 0 ||
-        currentPosition.y >= height / 20) {
+    if (playerSnake.hasHitWall(width: width, height: height, factor: 20)) {
       setState(() {
         gameState = GameState.failure;
       });
-      final score = Score()..score = points
+      final score = Score()
+        ..score = points
         ..date = DateTime.now();
       provider.setScore(score);
       return;
     }
-    final snakePositionCopy = List.of(snakePosition);
-    snakePositionCopy.removeAt(0);
-    if(snakePositionCopy.contains(currentPosition)){
+    if (playerSnake.hasHitSelf()) {
       setState(() {
         gameState = GameState.failure;
       });
-      final score = Score()..score = points
+      final score = Score()
+        ..score = points
         ..date = DateTime.now();
       provider.setScore(score);
       return;
     }
-    if (snakePosition.first.x == newPointPosition.x &&
-        snakePosition.first.y == newPointPosition.y) {
+    if (playerSnake.canEat(newPointPosition)) {
       _newPoint();
       setState(() {
         points += 10;
-        snakePosition.insert(0, getCurrentSnakePosition());
+        playerSnake.grow();
       });
-    }
-  }
-
-  Point getCurrentSnakePosition() {
-    final currentHead = snakePosition.first;
-    switch (_movement) {
-      case Movement.up:
-        return Point(currentHead.x, currentHead.y - 1);
-      case Movement.down:
-        return Point(currentHead.x, currentHead.y + 1);
-      case Movement.left:
-        return Point(currentHead.x - 1, currentHead.y);
-      case Movement.right:
-        return Point(currentHead.x + 1, currentHead.y);
     }
   }
 
@@ -202,7 +189,7 @@ class _GamePlayState extends State<GamePlay> {
             });
           },
           child:
-          const Text('Start Game', style: TextStyle(color: Colors.brown)),
+              const Text('Start Game', style: TextStyle(color: Colors.brown)),
         ),
       ),
     );
@@ -213,14 +200,7 @@ class _GamePlayState extends State<GamePlay> {
       return startBoard;
     }
     if (gameState == GameState.running) {
-      List<Positioned> snakeWithNewPoints = List.empty(growable: true);
-      for (var i = 0; i < snakePosition.length; i++) {
-        snakeWithNewPoints.add(Positioned(
-          left: snakePosition[i].x * 20,
-          top: snakePosition[i].y * 20,
-          child: snakePart(),
-        ));
-      }
+      final snakeWithNewPoints = playerSnake.advanceSnake();
       final latestPoint = Positioned(
           left: newPointPosition.x * 20,
           top: newPointPosition.y * 20,
@@ -239,28 +219,6 @@ class _GamePlayState extends State<GamePlay> {
     );
   }
 
-  void startSnake() {
-    setState(() {
-      final midPoint = (width / 20 / 2).roundToDouble();
-      snakePosition = [
-        Point(midPoint, midPoint - 1),
-        Point(midPoint, midPoint),
-        Point(midPoint, midPoint + 1),
-      ];
-    });
-  }
-
-  Widget snakePart() {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: const BoxDecoration(
-        color: Colors.green,
-        shape: BoxShape.rectangle,
-      ),
-    );
-  }
-
   Widget pointDot() {
     return Container(
         width: 20,
@@ -275,21 +233,3 @@ class _GamePlayState extends State<GamePlay> {
 const Widget startBoard = Center(
   child: Text('Tap to start the game'),
 );
-
-class Point {
-  final double x;
-  final double y;
-
-  const Point(this.x, this.y);
-
-  @override
-  String toString() => 'Point($x, $y)';
-
-  @override
-  bool operator ==(Object other) =>
-      other is Point &&
-          other.x == x && other.y == y;
-
-  @override
-  int get hashCode => '$x$y'.hashCode;
-}
