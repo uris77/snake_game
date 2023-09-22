@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:snake_game/ai_player.dart';
 import 'package:snake_game/db_provider.dart';
 import 'package:snake_game/game_parts.dart';
 import 'package:snake_game/persistence/entities/score.dart';
@@ -26,8 +27,9 @@ class _GamePlayState extends State<GamePlay> {
   Timer timer = Timer.periodic(Duration.zero, (_) {});
   var _movement = Movement.up;
   int points = 0;
-  Player playerSnake = Player();
-  Player aiSnake = Player.ai();
+  final playerSnake = Player();
+  final aiSnake = AIPlayer();
+  var aiRoute = List<Movement>.empty(growable: true);
 
   @override
   Widget build(BuildContext context) {
@@ -102,11 +104,14 @@ class _GamePlayState extends State<GamePlay> {
           playerSnake.initiateSnake(width: width, factor: 20);
           aiSnake.initiateSnake(width: width, factor: 25);
           _newPoint();
+          aiRoute.clear();
+          aiRoute = aiSnake.findRoute(newPointPosition);
           points = 0;
           gameState = GameState.running;
           _movement = Movement.up;
           playerSnake.move = _movement;
-          aiSnake.move = _randomMovement();
+          // aiSnake.move = _randomMovement();
+          aiSnake.move = aiRoute.removeAt(0);
           timer = Timer.periodic(const Duration(milliseconds: 300),
               (timer) => _onTick(timer, provider));
           break;
@@ -117,12 +122,6 @@ class _GamePlayState extends State<GamePlay> {
           break;
       }
     });
-  }
-
-  Movement _randomMovement() {
-    final range = Random();
-    final idx = range.nextInt(3);
-    return Movement.values[idx];
   }
 
   Point _randomPoint() {
@@ -157,7 +156,9 @@ class _GamePlayState extends State<GamePlay> {
       playerSnake.shrink();
       aiSnake.grow();
       aiSnake.shrink();
-      aiSnake.move = _randomMovement();
+      if (aiRoute.isNotEmpty) {
+        aiSnake.move = aiRoute.removeAt(0);
+      }
     });
     if (playerSnake.hasHitWall(width: width, height: height, factor: 20)) {
       setState(() {
@@ -169,12 +170,24 @@ class _GamePlayState extends State<GamePlay> {
       provider.setScore(score);
       return;
     }
-    if(aiSnake.hasHitWall(width: width, height: height, factor: 20)){
-      setState((){
+    if (aiSnake.hasHitWall(width: width, height: height, factor: 20)) {
+      setState(() {
         aiSnake.initiateSnake(width: width, factor: 25);
-        final mv = _randomMovement();
-        aiSnake.move = mv;
+        aiRoute = aiSnake.findRoute(newPointPosition);
+        aiSnake.move = aiRoute.removeAt(0);
       });
+    }
+
+    if(aiSnake.hasHitOther(playerSnake)) {
+      setState(() {
+        gameState = GameState.failure;
+
+      });
+      final score = Score()
+        ..score = points
+        ..date = DateTime.now();
+      provider.setScore(score);
+      return;
     }
     if (playerSnake.hasHitSelf()) {
       setState(() {
@@ -191,14 +204,17 @@ class _GamePlayState extends State<GamePlay> {
       setState(() {
         points += 10;
         playerSnake.grow();
-        aiSnake.move = _randomMovement();
+        aiSnake.move = aiRoute.removeAt(0);
+        aiRoute = aiSnake.findRoute(newPointPosition);
+        aiSnake.move = aiRoute.removeAt(0);
       });
     }
-    if(aiSnake.canEat(newPointPosition)) {
+    if (aiSnake.canEat(newPointPosition)) {
       _newPoint();
       setState(() {
         aiSnake.grow();
-        aiSnake.move = _randomMovement();
+        aiRoute = aiSnake.findRoute(newPointPosition);
+        aiSnake.move = aiRoute.removeAt(0);
       });
     }
   }
