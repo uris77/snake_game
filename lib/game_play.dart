@@ -27,6 +27,7 @@ class _GamePlayState extends State<GamePlay> {
   var _movement = Movement.up;
   int points = 0;
   Player playerSnake = Player();
+  Player aiSnake = Player.ai();
 
   @override
   Widget build(BuildContext context) {
@@ -98,12 +99,14 @@ class _GamePlayState extends State<GamePlay> {
     setState(() {
       switch (gameState) {
         case GameState.start:
-          playerSnake.initiateSnake(width);
+          playerSnake.initiateSnake(width: width, factor: 20);
+          aiSnake.initiateSnake(width: width, factor: 25);
           _newPoint();
           points = 0;
           gameState = GameState.running;
           _movement = Movement.up;
           playerSnake.move = _movement;
+          aiSnake.move = _randomMovement();
           timer = Timer.periodic(const Duration(milliseconds: 300),
               (timer) => _onTick(timer, provider));
           break;
@@ -114,6 +117,12 @@ class _GamePlayState extends State<GamePlay> {
           break;
       }
     });
+  }
+
+  Movement _randomMovement() {
+    final range = Random();
+    final idx = range.nextInt(3);
+    return Movement.values[idx];
   }
 
   Point _randomPoint() {
@@ -134,7 +143,7 @@ class _GamePlayState extends State<GamePlay> {
   void _newPoint() {
     setState(() {
       final newPoint = _randomPoint();
-      if (playerSnake.hasPoint(newPoint)) {
+      if (playerSnake.hasPoint(newPoint) || aiSnake.hasPoint(newPoint)) {
         _newPoint();
       } else {
         newPointPosition = newPoint;
@@ -146,6 +155,9 @@ class _GamePlayState extends State<GamePlay> {
     setState(() {
       playerSnake.grow();
       playerSnake.shrink();
+      aiSnake.grow();
+      aiSnake.shrink();
+      aiSnake.move = _randomMovement();
     });
     if (playerSnake.hasHitWall(width: width, height: height, factor: 20)) {
       setState(() {
@@ -156,6 +168,13 @@ class _GamePlayState extends State<GamePlay> {
         ..date = DateTime.now();
       provider.setScore(score);
       return;
+    }
+    if(aiSnake.hasHitWall(width: width, height: height, factor: 20)){
+      setState((){
+        aiSnake.initiateSnake(width: width, factor: 25);
+        final mv = _randomMovement();
+        aiSnake.move = mv;
+      });
     }
     if (playerSnake.hasHitSelf()) {
       setState(() {
@@ -172,6 +191,14 @@ class _GamePlayState extends State<GamePlay> {
       setState(() {
         points += 10;
         playerSnake.grow();
+        aiSnake.move = _randomMovement();
+      });
+    }
+    if(aiSnake.canEat(newPointPosition)) {
+      _newPoint();
+      setState(() {
+        aiSnake.grow();
+        aiSnake.move = _randomMovement();
       });
     }
   }
@@ -201,11 +228,13 @@ class _GamePlayState extends State<GamePlay> {
     }
     if (gameState == GameState.running) {
       final snakeWithNewPoints = playerSnake.advanceSnake();
+      final aiSnakeWithNewPoints = aiSnake.advanceSnake();
       final latestPoint = Positioned(
           left: newPointPosition.x * 20,
           top: newPointPosition.y * 20,
           child: pointDot());
       snakeWithNewPoints.add(latestPoint);
+      snakeWithNewPoints.addAll(aiSnakeWithNewPoints);
       return Stack(
         children: snakeWithNewPoints,
       );

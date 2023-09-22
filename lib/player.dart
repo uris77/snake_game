@@ -6,9 +6,19 @@ import 'package:snake_game/game_parts.dart';
 /// It knows its position, its direction, and its length.
 /// It can move the snake, and it can grow the snake.
 class Player {
+
   List<Point> snake = List.empty();
   var _movement = Movement.up;
   var points = 0;
+  bool isAi = false;
+
+  Player() {
+    isAi = false;
+  }
+
+  Player.ai() {
+    isAi = true;
+  }
 
   Point getCurrentPosition() {
     final head = snake.first;
@@ -28,15 +38,15 @@ class Player {
     return Container(
       width: 20,
       height: 20,
-      decoration: const BoxDecoration(
-        color: Colors.green,
+      decoration: BoxDecoration(
+        color: isAi ? Colors.blueAccent : Colors.green,
         shape: BoxShape.rectangle,
       ),
     );
   }
 
-  void initiateSnake(double width) {
-    final midPoint = (width / 20 / 2).roundToDouble();
+  void initiateSnake({required double width, required int factor}) {
+    final midPoint = (width / factor / 2).roundToDouble();
     snake = [
       Point(midPoint, midPoint - 1),
       Point(midPoint, midPoint),
